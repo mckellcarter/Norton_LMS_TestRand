@@ -6,7 +6,9 @@ xml_paragraph = '<w:p>'
 ques_tag = '<w:ilvl w:val="0"/>'
 ans_tag = '<w:ilvl w:val="1"/>'
 ans_key_tag = '<w:t>Answer:</w:t>'
-
+word_text_tag = '<w:t>'
+alt_word_text_tag = '<w:t xml:space="preserve">'
+word_text_end_tag = '</w:t>'
 
 class LMS_test_vers: 
 
@@ -31,26 +33,26 @@ class LMS_test_vers:
         #if we have a non-indented list item and are outside the answer key, new question
         if q_temp == '':
         #if we haven't started a question
-          q_temp = p
+          q_temp = self.extract_text(p)
         else:
         #already have a question in process, time to push it and start a new one. 
           self.questions.append(LMS_question(q_temp, ans_temp, q_foot=q_temp_extra)) 
-          q_temp = p
+          q_temp = self.extract_text(p)
           ans_temp = []
           q_temp_extra = []
       elif ans_tag in p and q_temp != '': 
       #if we are in a question and have an indented list item
-        ans_temp.append(p)
+        ans_temp.append(self.extract_text(p))
       elif '<w:t>Answer Key</w:t>' in p:
       #begin Answer key, reset question gathering
-        self.__answer_key_header__.append(p)
+        self.__answer_key_header__.append(self.extract_text(p))
         self.questions.append(LMS_question(q_temp, ans_temp, q_foot=q_temp_extra))
         q_temp = ''
         ans_temp = []    
         q_temp_extra = [] 
       elif q_temp and not(self.__answer_key_header__): 
         #processing a question but not an answer option so store to be dumped after answers
-        q_temp_extra.append(p)   
+        q_temp_extra.append(self.extract_text(p))   
       elif self.__answer_key_header__ and ques_tag in p:
         #if in the answer key and detect an unindented list item 
         answer_key_count += 1 
@@ -86,10 +88,11 @@ class LMS_test_vers:
 
   def print_new_test(self, fname, nQs=-1, shuffleQs=False, shuffleAs=False):
     ans_out = ['A', 'B', 'C', 'D', 'E']
-    new_xml = []
-    new_xml = self.add_paragraphs( new_xml, self.__test_header__)
-    ans_xml = []
-    ans_xml = self.add_paragraphs( ans_xml, self.__answer_key_header__)
+    new_out = []
+    
+    new_out = self.add_paragraphs( new_out, self.__test_header__)
+    ans_out = []
+    ans_out = self.add_paragraphs( ans_out, self.__answer_key_header__)
     total_q_n = len(self.questions)
     new_inds = [i for i in range(total_q_n)]
     if shuffleQs: 
@@ -101,8 +104,8 @@ class LMS_test_vers:
       if shuffleAs: 
         tmp_question = self.questions[i].shuffle_answers()
       tmp_para, tmp_ans = tmp_question.print_question()
-      new_xml.append(tmp_para)
-      ans_xml.append( ans_out[tmp_ans] + "  </w:t>")
+      new_out.append(tmp_para)
+      ans_out.append( ans_out[tmp_ans] + "  </w:t>")
     
     #join into text 
     new_xml_joined = xml_paragraph.join(new_xml)
@@ -121,6 +124,17 @@ class LMS_test_vers:
 #    ansdoc = docx.Document()
 #    ansdoc.sections[0].append(new_xml_joined)
 #    ansdoc.save('Key_' + fname)
+
+  def extract_text(self, mystr):
+    #takes an xml paragraph as input. Extractts all text inside w:t tags
+    ret_str = ''
+    for j, q in enumerate(mystr.split('\n')):
+      if word_text_end_tag in q: 
+        tmp_str = mystr.split(word_text_tag)[-1]
+        tmp_str = tmp_str.split(alt_word_text_tag)[-1]
+        tmp_str = tmp_str.split(word_text_end_tag)[0]
+        ret_str += tmp_str
+    return ret_str
 
 
 class LMS_question: 
