@@ -73,7 +73,7 @@ class LMS_test_vers:
       elif '<w:br w:type="page"/>' in p: 
         pass 
       else: 
-        self.__test_header__.append(p)
+        self.__test_header__.append(self.extract_text(p, concat=False))
   
   def add_paragraphs(self,old_list, new_item):
     if not(isinstance(old_list, list)): 
@@ -88,11 +88,13 @@ class LMS_test_vers:
 
   def print_new_test(self, fname, nQs=-1, shuffleQs=False, shuffleAs=False):
     ans_out = ['A', 'B', 'C', 'D', 'E']
-    new_out = []
+    new_doc = docx.Document()
+    key_doc = docx.Document()
+
+    #add headers to new test and new answer key
+    new_doc.add_paragraph(self.__test_header__)
+    key_doc.add_paragraph(self.__answer_key_header__)
     
-    new_out = self.add_paragraphs( new_out, self.__test_header__)
-    ans_out = []
-    ans_out = self.add_paragraphs( ans_out, self.__answer_key_header__)
     total_q_n = len(self.questions)
     new_inds = [i for i in range(total_q_n)]
     if shuffleQs: 
@@ -103,37 +105,28 @@ class LMS_test_vers:
       tmp_question = self.questions[i]
       if shuffleAs: 
         tmp_question = self.questions[i].shuffle_answers()
-      tmp_para, tmp_ans = tmp_question.print_question()
-      new_out.append(tmp_para)
-      ans_out.append( ans_out[tmp_ans] + "  </w:t>")
-    
-    #join into text 
-    new_xml_joined = xml_paragraph.join(new_xml)
-    ans_xml_joined = xml_paragraph.join(ans_xml)
+      tmp_ans = tmp_question.print_question(new_doc, key_doc)
+      key_doc.add_paragraph(ans_out[tmp_ans], style='List Number') 
 
-    f = open("demofile3.txt", "w")
-    f.write(new_xml_joined)
-    f.close()
-
-    #dump test xml to new doc
-    #newdoc = docx.Document()
-    #newdoc.element.xml = new_xml_joined
-    #newdoc.save(fname)
-
-    #dump ans xml to new doc
-#    ansdoc = docx.Document()
-#    ansdoc.sections[0].append(new_xml_joined)
-#    ansdoc.save('Key_' + fname)
-
-  def extract_text(self, mystr):
+    new_doc.save(fname)
+    key_doc.save('key_'+fname)
+ 
+  def extract_text(self, mystr, concat=True):
     #takes an xml paragraph as input. Extractts all text inside w:t tags
     ret_str = ''
-    for j, q in enumerate(mystr.split('\n')):
+    for j, q in enumerate(mystr.split('\n'), concat):
       if word_text_end_tag in q: 
         tmp_str = mystr.split(word_text_tag)[-1]
         tmp_str = tmp_str.split(alt_word_text_tag)[-1]
         tmp_str = tmp_str.split(word_text_end_tag)[0]
-        ret_str += tmp_str
+        if concat: 
+          ret_str += tmp_str
+        else:
+          if isinstance(ret_str, str):
+            ret_str = []
+          ret_str.append(tmp_str)
+    if not(concat):
+      ret_str = '\n'.join(ret_str)
     return ret_str
 
 
@@ -155,15 +148,19 @@ class LMS_question:
     new_correct = [i for i,v in enumerate(new_answers) if v==corr_answer][0] #find the index of the item matching the old correct answer (assumes unique answer entries) 
     return LMS_question(self.question, new_answers, c=new_correct, q_foot=self.q_foot)
 
-  def print_question(self):
-    para_list = [ self.question ]
-    for a in self.answers: 
-      para_list.append(a)
+  def print_question(self, testdoc, keydoc):
+    testdoc.add_paragraph(self.question, style='List Number')
+    for j,a in enumerate(self.answers): 
+      #if j==0:
+        #testdoc.add_paragraph(a, numbering: {
+        #        reference: "padded-numbering-reference",
+        #        level: 0,
+        #        instance: 2}
+      testdoc.add_paragraph(a, style='List Number 2')
     if isinstance(self.q_foot, list): 
       for a in self.q_foot:
-        para_list.append(a)
+        testdoc.add_paragraph(a)
     else: 
-      para_list.append(self.q_foot)
-    ret_para = xml_paragraph.join(para_list)
+      testdoc.add_paragraph(a)
     ret_ans = self.correct
-    return ret_para, ret_ans
+    return ret_ans
