@@ -121,7 +121,10 @@ class LMS_test_vers:
       key_doc.add_paragraph(ans_out[tmp_ans], style='List Number') 
 
     new_doc.save(fname)
-    key_doc.save('key_'+fname)
+    tmp_fname = fname.split('.docx')
+    tmp_fname[0] = tmp_fname[0] + "_key"
+    key_fname = ".docx".join(tmp_fname)
+    key_doc.save(key_fname)
  
   def extract_text(self, mystr, concat=True):
     #takes an xml paragraph as input. Extractts all text inside w:t tags
