@@ -3,6 +3,7 @@ import random
 
 #XML tags
 xml_paragraph = '<w:p>'
+xml_paragraph_end = '</w:p>'
 ques_tag = '<w:ilvl w:val="0"/>'
 ans_tag = '<w:ilvl w:val="1"/>'
 ans_key_tag = '<w:t>Answer:</w:t>'
@@ -26,7 +27,7 @@ class LMS_test_vers:
     in_key_answer = False  #use to flag when the next paragraph will have an answer
     
     d = docx.Document(docx_file) 
-    ps = d.element.xml.split(xml_paragraph)
+    ps = d.element.xml.split(xml_paragraph_end)
     for j,p in enumerate(ps): 
       ######process questions ###############
       if  ques_tag in p and not(self.__answer_key_header__):
@@ -71,9 +72,12 @@ class LMS_test_vers:
         self.questions[answer_key_count].update_answer(key_answer)
         in_key_answer = False  #reset in_key_answer flag
       elif '<w:br w:type="page"/>' in p: 
-        pass 
-      else: 
+         pass 
+      elif not(self.__answer_key_header__):
         self.__test_header__.append(self.extract_text(p, concat=False))
+      else: 
+        self.__answer_key_header__.append(self.extract_text(p, concat=False))
+        
   
   def add_paragraphs(self,old_list, new_item):
     if not(isinstance(old_list, list)): 
@@ -92,8 +96,16 @@ class LMS_test_vers:
     key_doc = docx.Document()
 
     #add headers to new test and new answer key
-    new_doc.add_paragraph(self.__test_header__)
-    key_doc.add_paragraph(self.__answer_key_header__)
+    if isinstance(self.__test_header__, list): 
+      for i in self.__test_header__:
+        new_doc.add_paragraph(i)
+    else: 
+      new_doc.add_paragraph(self.__test_header__)
+    if isinstance(self.__answer_key_header__, list):
+      for i in self.__answer_key_header__:
+        key_doc.add_paragraph(i)
+    else: 
+      key_doc.add_paragraph(self.__answer_key_header__)
     
     total_q_n = len(self.questions)
     new_inds = [i for i in range(total_q_n)]
@@ -114,19 +126,21 @@ class LMS_test_vers:
   def extract_text(self, mystr, concat=True):
     #takes an xml paragraph as input. Extractts all text inside w:t tags
     ret_str = ''
-    for j, q in enumerate(mystr.split('\n'), concat):
-      if word_text_end_tag in q: 
-        tmp_str = mystr.split(word_text_tag)[-1]
+    for j, q in enumerate(mystr.split(word_text_end_tag), concat):
+      if word_text_tag in q or alt_word_text_tag in q:
+        tmp_str = q.split(word_text_tag)[-1]
         tmp_str = tmp_str.split(alt_word_text_tag)[-1]
-        tmp_str = tmp_str.split(word_text_end_tag)[0]
-        if concat: 
-          ret_str += tmp_str
+        if concat:
+          if not(ret_str) and isinstance(ret_str, str):  
+            ret_str += tmp_str
+          elif not(tmp_str in ret_str[-1]) and isinstance(ret_str, str):
+            ret_str += tmp_str
         else:
           if isinstance(ret_str, str):
             ret_str = []
           ret_str.append(tmp_str)
-    if not(concat):
-      ret_str = '\n'.join(ret_str)
+#    if not(concat) and isinstance(ret_str, list):
+#      ret_str = '\n'.join(ret_str)
     return ret_str
 
 
@@ -151,12 +165,21 @@ class LMS_question:
   def print_question(self, testdoc, keydoc):
     testdoc.add_paragraph(self.question, style='List Number')
     for j,a in enumerate(self.answers): 
+      ##method 1 
       #if j==0:
         #testdoc.add_paragraph(a, numbering: {
         #        reference: "padded-numbering-reference",
         #        level: 0,
         #        instance: 2}
-      testdoc.add_paragraph(a, style='List Number 2')
+      ##method 2 
+      #testdoc.add_paragraph(a, style='List Number 2')
+      ##method 3 
+      if j == 0:
+        ans_list = Paragraph_list(testdoc, a, True, 'Roman', level=2)
+      else:
+        ans_list.add_item(a, 2)
+      
+
     if isinstance(self.q_foot, list): 
       for a in self.q_foot:
         testdoc.add_paragraph(a)
@@ -164,3 +187,65 @@ class LMS_question:
       testdoc.add_paragraph(a)
     ret_ans = self.correct
     return ret_ans
+
+class Paragraph_list(object):
+  ##this solution to the list styles issue comes from rdt0086 on stack overflow
+  #example use: 
+  #mylist2 = Paragraph_List(document, 'Bullet Level 1 Item 1', False)
+  #mylist2.add_item('Level 1 Item2',1)
+  #mylist2.add_item('Level 2 Item1',2)
+  #mylist2.add_item('Level 1 Item3',1)
+  #mylist2.add_item('Level 2 Item1',2)
+  #mylist2.add_item('Level 2 Item2',2)
+  #mylist2.add_item('Level 2 Item3',2)
+  #mylist2.add_item('Level 3 Item1',3)
+  #mylist2.add_item('Level 4 Item1',4)
+  #mylist2.add_item('Level 4 Item2',4)
+  #mylist2.add_item('Level 2 Item4',2)
+
+  #above use is:
+  #ans_list = Paragraph_list(testdoc, a, True, 'ABC')
+  #ans_list.add_item(ans2, 1)
+
+  def __init__(self,doc,item1,ordered=False,style='',fmt=[[]],level=1): #args are: doc,item1,ordered,style,fmt,level (style, fmt, level optional)
+    self.doc = doc
+    self.item1 = item1
+    self.ordered = ordered
+    self.style = style
+    self.fmt = fmt
+    self.level = level
+    self.place = {}
+    self.place[level] = 0
+ 
+    List_dict = {'Roman':[['I','II','III','IV','V','VI','VII','VIII','IIX','IX','X'],['A','B','C','D','E','F',
+      'G','H','I','J','K','L'],['1','2','3','4','5','6','7','8','9','10'],['a','b','c','d','e','f','g','h',
+      'i'],['i','ii','iii','iv','v','vi','vii','viii','iix','ix','x']],'ABC':[['A','B','C','D','E','F','G',
+      'H','I','J','K','L'],['1','2','3','4','5','6','7','8','9','10'],['a','b','c','d','e','f','g','h','i'],
+      ['i','ii','iii','iv','v','vi','vii','viii','iix','ix','x']],'123':[['1','2','3','4','5','6','7','8','9','10'
+      ],['a','b','c','d','e','f','g','h','i'],['i','ii','iii','iv','v','vi','vii','viii','iix','ix','x']],'Bullet':[
+      ['●','○','•','◦']]}
+    if self.ordered == True:
+      if not(self.style):
+        self.fmt = List_dict['Roman']
+      elif self.style == 'Custom':
+        self.fmt = fmt
+      else:
+        self.fmt = List_dict[self.style]
+        self.p = self.doc.add_paragraph("\t"*(self.level-1) + self.fmt[self.level-1][0]+'. ' + self.item1 + '\n')
+    else:
+      self.fmt = List_dict['Bullet']
+      self.p = self.doc.add_paragraph("\t"*(self.level-1) +  self.fmt[self.level-1][0]+ ' ' + self.item1 + '\n')
+      # self.doc.add_paragraph(item1, style=self.level)
+
+  def add_item(self, item, level):
+    self.level = level
+    sp = "\t"
+    sp = sp *(self.level-1)
+    if self.level in self.place:
+      self.place[self.level] += 1
+    else:
+      self.place[self.level] = 0
+    if self.ordered ==True:
+      self.p.add_run(sp + self.fmt[self.level - 1][self.place[self.level]] + '. ' + item + '\n')
+    else:
+      self.p.add_run(sp + self.fmt[0][self.level - 1]+ ' ' + item + '\n')
