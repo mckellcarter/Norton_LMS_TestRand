@@ -1,5 +1,6 @@
 import docx
 import random
+import re
 
 #XML tags
 xml_paragraph = '<w:p>'
@@ -59,15 +60,15 @@ class LMS_test_vers:
         answer_key_count += 1 
         in_key_answer = True 
       elif in_key_answer and self.__answer_key_header__:
-        if '<w:t>A</w:t>' in p: 
+        if re.findall('<w:t(>|\\s\\S*>+?)\\s*A\\s*<\\/w:t>',p): 
           key_answer = 0
-        elif '<w:t>B</w:t>' in p: 
+        elif re.findall('<w:t(>|\\s\\S*>+?)\\s*B\\s*<\\/w:t>',p): 
           key_answer = 1 
-        elif '<w:t>C</w:t>' in p: 
+        elif re.findall('<w:t(>|\\s\\S*>+?)\\s*C\\s*<\\/w:t>',p): 
           key_answer = 2
-        elif '<w:t>D</w:t>' in p: 
+        elif re.findall('<w:t(>|\\s\\S*>+?)\\s*D\\s*<\\/w:t>',p): 
           key_answer = 3 
-        elif '<w:t>E</w:t>' in p: 
+        elif re.findall('<w:t(>|\\s\\S*>+?)\\s*E\\s*<\\/w:t>',p): 
           key_answer = 4
         self.questions[answer_key_count].update_answer(key_answer)
         in_key_answer = False  #reset in_key_answer flag
